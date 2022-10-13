@@ -279,8 +279,10 @@ def export_engine(model, im, file, half, dynamic, simplify, workspace=4, verbose
     inputs = [network.get_input(i) for i in range(network.num_inputs)]
     outputs = [network.get_output(i) for i in range(network.num_outputs)]
     for inp in inputs:
+        inp.dtype = trt.DataType.FLOAT
         LOGGER.info(f'{prefix} input "{inp.name}" with shape{inp.shape} {inp.dtype}')
     for out in outputs:
+        out.dtype = trt.DataType.FLOAT
         LOGGER.info(f'{prefix} output "{out.name}" with shape{out.shape} {out.dtype}')
 
     if dynamic:
