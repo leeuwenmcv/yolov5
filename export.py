@@ -238,7 +238,7 @@ def export_coreml(model, im, file, int8, half, prefix=colorstr('CoreML:')):
 
 
 @try_export
-def export_engine(model, im, file, half, dynamic, simplify, workspace=4, verbose=False, prefix=colorstr('TensorRT:')):
+def export_engine(model, im, file, half, dynamic, simplify, workspace=4, verbose=False,dla_core=-1, prefix=colorstr('TensorRT:')):
     # YOLOv5 TensorRT export https://developer.nvidia.com/tensorrt
     assert im.device.type != 'cpu', 'export running on CPU but must be on GPU, i.e. `python export.py --device 0`'
     try:
@@ -269,6 +269,11 @@ def export_engine(model, im, file, half, dynamic, simplify, workspace=4, verbose
     config = builder.create_builder_config()
     config.max_workspace_size = workspace * 1 << 30
     # config.set_memory_pool_limit(trt.MemoryPoolType.WORKSPACE, workspace << 30)  # fix TRT 8.4 deprecation notice
+
+    if dla_core > -1:
+        config.default_device_type = trt.DeviceType.DLA
+        config.DLA_core = dla_core
+        config.set_flag(trt.BuilderFlag.GPU_FALLBACK)
 
     flag = (1 << int(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH))
     network = builder.create_network(flag)
@@ -479,6 +484,7 @@ def run(
         topk_all=100,  # TF.js NMS: topk for all classes to keep
         iou_thres=0.45,  # TF.js NMS: IoU threshold
         conf_thres=0.25,  # TF.js NMS: confidence threshold
+        dla_core=-1,
 ):
     t = time.time()
     include = [x.lower() for x in include]  # to lowercase
@@ -527,7 +533,7 @@ def run(
     if jit:  # TorchScript
         f[0], _ = export_torchscript(model, im, file, optimize)
     if engine:  # TensorRT required before ONNX
-        f[1], _ = export_engine(model, im, file, half, dynamic, simplify, workspace, verbose)
+        f[1], _ = export_engine(model, im, file, half, dynamic, simplify, workspace, verbose,dla_core)
     if onnx or xml:  # OpenVINO requires ONNX
         f[2], _ = export_onnx(model, im, file, opset, dynamic, simplify)
     if xml:  # OpenVINO
@@ -599,6 +605,7 @@ def parse_opt():
     parser.add_argument('--topk-all', type=int, default=100, help='TF.js NMS: topk for all classes to keep')
     parser.add_argument('--iou-thres', type=float, default=0.45, help='TF.js NMS: IoU threshold')
     parser.add_argument('--conf-thres', type=float, default=0.25, help='TF.js NMS: confidence threshold')
+    parser.add_argument('--dla-core', type=int, default=-1, help='dla-core to use')
     parser.add_argument(
         '--include',
         nargs='+',
